@@ -50,7 +50,13 @@ const (
 	evMouseBtnLeft   = 0x110
 	evMouseBtnRight  = 0x111
 	evMouseBtnMiddle = 0x112
-	evBtnTouch       = 0x14a
+
+	evBtnTouch         = 0x14a
+	evBtnToolFinger    = 0x145
+	evBtnToolDoubleTap = 0x14d
+	evBtnToolTripleTap = 0x14e
+	evBtnToolQuadTap   = 0x14f
+	evBtnToolQuintTap  = 0x148
 )
 
 const (

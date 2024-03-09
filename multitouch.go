@@ -86,7 +86,7 @@ func createMultiTouch(path string, name []byte, minX int32, maxX int32, minY int
 		return nil, fmt.Errorf("failed to register key device: %v", err)
 	}
 
-	for _, event := range []int{evBtnTouch} {
+	for _, event := range []int{evBtnTouch, evBtnToolFinger, evBtnToolDoubleTap, evBtnToolTripleTap, evBtnToolQuadTap, evBtnToolQuintTap} {
 		err = ioctl(deviceFile, uiSetKeyBit, uintptr(event))
 		if err != nil {
 			_ = deviceFile.Close()
@@ -139,7 +139,15 @@ func createMultiTouch(path string, name []byte, minX int32, maxX int32, minY int
 
 // The contact will be held down at the coordinates specified
 func (c multiTouchContact) TouchDownAt(x int32, y int32) error {
+	var activeContacts int32 = 0
 	var events []inputEvent
+
+	// Find amount of contacts where tracking_id is NOT -1
+	for _, contact := range c.multitouch.contacts {
+		if contact.tracking_id != -1 {
+			activeContacts++
+		}
+	}
 
 	events = append(events, inputEvent{
 		Type:  evAbs,
@@ -159,13 +167,108 @@ func (c multiTouchContact) TouchDownAt(x int32, y int32) error {
 
 	c.tracking_id = c.slot
 
+	var currentTouch uint16
+	var previousTouch uint16
+
+	// Not very elegant :,)
+	switch activeContacts {
+	case 0:
+		currentTouch = evBtnToolFinger
+		events = append(events, inputEvent{
+			Type:  evKey,
+			Code:  evBtnTouch,
+			Value: btnStatePressed,
+		})
+	case 1:
+		currentTouch = evBtnToolDoubleTap
+		previousTouch = evBtnToolFinger
+	case 2:
+		currentTouch = evBtnToolTripleTap
+		previousTouch = evBtnToolDoubleTap
+	case 3:
+		currentTouch = evBtnToolQuadTap
+		previousTouch = evBtnToolTripleTap
+	case 4:
+		currentTouch = evBtnToolQuintTap
+		previousTouch = evBtnToolQuadTap
+	}
+
+	// Release previous touch
+	if activeContacts > 0 {
+		events = append(events, inputEvent{
+			Type:  evKey,
+			Code:  previousTouch,
+			Value: btnStateReleased,
+		})
+	}
+
+	// New touch
+	events = append(events, inputEvent{
+		Type:  evKey,
+		Code:  currentTouch,
+		Value: btnStatePressed,
+	})
+
 	return c.sendAbsEvent(events)
 }
 
 // The contact will be raised off of the surface
 func (c multiTouchContact) TouchUp() error {
+	var activeContacts int32 = 0
+	var events []inputEvent
+
+	// Find amount of contacts where tracking_id is NOT -1
+	for _, contact := range c.multitouch.contacts {
+		if contact.tracking_id != -1 {
+			activeContacts++
+		}
+	}
+
 	c.tracking_id = -1
-	return c.sendAbsEvent(nil)
+
+	var currentTouch uint16
+	var previousTouch uint16
+
+	// Not very elegant :,)
+	switch activeContacts {
+	case 1:
+		currentTouch = evBtnToolFinger
+		events = append(events, inputEvent{
+			Type:  evKey,
+			Code:  evBtnTouch,
+			Value: btnStateReleased,
+		})
+	case 2:
+		currentTouch = evBtnToolDoubleTap
+		previousTouch = evBtnToolFinger
+	case 3:
+		currentTouch = evBtnToolTripleTap
+		previousTouch = evBtnToolDoubleTap
+	case 4:
+		currentTouch = evBtnToolQuadTap
+		previousTouch = evBtnToolTripleTap
+	case 5:
+		currentTouch = evBtnToolQuintTap
+		previousTouch = evBtnToolQuadTap
+	}
+
+	// Release previous touch
+	if activeContacts > 1 {
+		events = append(events, inputEvent{
+			Type:  evKey,
+			Code:  currentTouch,
+			Value: btnStateReleased,
+		})
+	}
+
+	// New touch
+	events = append(events, inputEvent{
+		Type:  evKey,
+		Code:  previousTouch,
+		Value: btnStatePressed,
+	})
+
+	return c.sendAbsEvent(events)
 }
 
 func (c multiTouchContact) sendAbsEvent(events []inputEvent) error {
