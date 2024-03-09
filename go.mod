@@ -1,3 +1,3 @@
-module github.com/bendahl/uinput
+module github.com/excigma/uinput-mt-touchpad
 
 go 1.13
