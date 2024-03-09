@@ -56,7 +56,11 @@ func CreateMultiTouch(path string, name []byte, minX int32, maxX int32, minY int
 	var multitouch vMultiTouch = vMultiTouch{name: name, deviceFile: fd}
 
 	for i := int32(0); i < maxContacts; i++ {
-		multitouch.contacts = append(multitouch.contacts, multiTouchContact{slot: i, multitouch: &multitouch})
+		multitouch.contacts = append(multitouch.contacts, multiTouchContact{
+			slot:        i,
+			tracking_id: -1,
+			multitouch:  &multitouch,
+		})
 	}
 
 	return multitouch, nil
@@ -144,7 +148,7 @@ func (c multiTouchContact) TouchDownAt(x int32, y int32) error {
 
 	// Find amount of contacts where tracking_id is NOT -1
 	for _, contact := range c.multitouch.contacts {
-		if contact.tracking_id != -1 {
+		if contact.tracking_id > 0 {
 			activeContacts++
 		}
 	}
@@ -166,6 +170,7 @@ func (c multiTouchContact) TouchDownAt(x int32, y int32) error {
 	})
 
 	c.tracking_id = c.slot
+	c.multitouch.contacts[c.slot] = c
 
 	var currentTouch uint16
 	var previousTouch uint16
@@ -219,12 +224,13 @@ func (c multiTouchContact) TouchUp() error {
 
 	// Find amount of contacts where tracking_id is NOT -1
 	for _, contact := range c.multitouch.contacts {
-		if contact.tracking_id != -1 {
+		if contact.tracking_id > 0 {
 			activeContacts++
 		}
 	}
 
 	c.tracking_id = -1
+	c.multitouch.contacts[c.slot] = c
 
 	var currentTouch uint16
 	var previousTouch uint16
